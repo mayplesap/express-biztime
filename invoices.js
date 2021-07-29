@@ -23,25 +23,23 @@ router.get("/:id", async function (req, res, next) {
       `SELECT id, amt, paid, add_date, paid_date, comp_code
           FROM invoices
           WHERE id=$1`, [req.params.id]);
-  const invoice = invoiceResult.rows[0];
 
-  if (invoiceResult.rowCount < 1) {
-    throw new NotFoundError();
+  const invoiceData = invoiceResult.rows[0];
+
+  if (!invoiceData) { 
+    throw new NotFoundError(`Invoice ${req.params.id} not found`); 
   }
+
+  const { comp_code, ...invoice } = invoiceData;
 
   const companyResult = await db.query(
       `SELECT code, name, description 
           FROM companies
-          WHERE code=$1`, [invoice.comp_code]);
+          WHERE code=$1`, [comp_code]);
   const company = companyResult.rows[0];
 
-  const result = { id:invoice.id,
-                   amt:invoice.amt,
-                   paid:invoice.paid,
-                   add_date:invoice.add_date,
-                   paid_date:invoice.paid_date,
-                   company };
-  return res.json({ invoice:result });
+  invoice.company = company;
+  return res.json({ invoice });
 });
 
 /** POST invoices: 
@@ -73,9 +71,11 @@ router.put("/:id", async function (req, res, next) {
         RETURNING id, comp_code, amt, paid, add_date, paid_date`, 
     [amt, req.params.id]);
     const invoice = result.rows[0];
-    if (result.rowCount < 1) {
-      throw new NotFoundError();
+
+    if (!invoice) { 
+      throw new NotFoundError(`Invoice ${req.params.id} not found`); 
     }
+
     return res.json({ invoice });
 })
 
@@ -88,7 +88,7 @@ router.delete("/:id", async function (req, res, next) {
     WHERE id=$1`, [req.params.id]);
 
   if (result.rowCount < 1) {
-    throw new NotFoundError();
+    throw new NotFoundError(`Invoice ${req.params.id} not found`);
   }
 
   await db.query(`DELETE FROM invoices WHERE id=$1`, 
