@@ -2,32 +2,32 @@ const request = require("supertest");
 const app = require("./app");
 const db = require("./db");
 
-let invoice1, invoice2;
+let invoice1, invoice2, company;
 
 beforeEach(async function () {
-  await db.query("DELETE FROM companies");
   await db.query("DELETE FROM invoices"); 
+  await db.query("DELETE FROM companies");
   
-  await db.query(
+  const companyResult = await db.query(
     `INSERT INTO companies (code, name, description)
     VALUES ('test', 'Test', 'company test')
-    RETURNING code;`);
+    RETURNING code, name, description;`);
+  company = companyResult.rows[0];
 
-  const results = await db.query(
+  const invoiceResults = await db.query(
     `INSERT INTO invoices (comp_code, amt)
     VALUES ('test', '10'),
            ('test', '20')
-    RETURNING id, comp_code, amt, paid, add_date, paid_date;`);
-  console.log(results);
-  invoice1 = results.rows[0];
-  invoice2 = results.rows[1];
+    RETURNING id, add_date`);
+  invoice1 = invoiceResults.rows[0];
+  invoice2 = invoiceResults.rows[1];
 })
 
 
 describe("GET /invoices", function () {
   it("Gets a list of invoices", async function() {
     const resp = await request(app).get("/invoices");
-    console.log(resp);
+
     expect(resp.body).toEqual({
         "invoices": [
           {
@@ -43,96 +43,79 @@ describe("GET /invoices", function () {
   });
 });
 
-// describe("GET /companies/:code", function () {
-//   it("Gets a single company", async function () {
-//     const resp = await request(app).get("/companies/test");
+describe("GET /invoices/:id", function () {
+  it("Gets a single invoice", async function () {
+    const resp = await request(app).get(`/invoices/${invoice1.id}`);
+    expect(resp.body).toEqual({"invoice": {
+      "id": invoice1.id,
+      "amt": "10.00",
+      "paid": false,
+      "add_date": expect.any(String),
+      "paid_date": null,
+      "company": company
+    }});
+  });
 
-//     expect(resp.body).toEqual({"company": {
-//       "code": "test",
-//       "name": "Test",
-//       "description": "company test",
-//       "invoices": [expect.any(Number), expect.any(Number)]
-//     }});
-//   });
+  it("Fail to get an invoice that does not exist", async function () {
+    const resp = await request(app).get("/invoices/0");
 
-//   it("Fail to get a company that does not exist", async function () {
-//     const resp = await request(app).get("/companies/apple");
+    expect(resp.statusCode).toEqual(404);
+    expect(resp.body).toEqual({"error": {
+      "message": "Invoice 0 not found",
+      "status": 404
+    }});
+  });
+});
 
-//     expect(resp.statusCode).toEqual(404);
-//     expect(resp.body).toEqual({"error": {
-//       "message": "Company apple not found",
-//       "status": 404
-//     }});
-//   });
-// });
+describe("POST /invoices", function () {
+  it("Adds a new invoice to invoices", async function () {
+    const beforePost = await db.query(
+      `SELECT id
+            FROM invoices`);
+    const beforePostInvoices = beforePost.rows;
+    expect(beforePostInvoices.length).toEqual(2);
 
-// describe("POST /companies", function () {
-//   it("Adds a new company to companies", async function () {
-//     const beforePost = await db.query(
-//       `SELECT code, name, description
-//             FROM companies`);
-//     const beforePostCompanies = beforePost.rows;
-//     expect(beforePostCompanies.length).toEqual(1);
+    const resp = await request(app).post("/invoices").send({
+      comp_code: "test",
+      amt: "30",
+    });
 
-//     const resp = await request(app).post("/companies").send({
-//       code: "test2",
-//       name: "Test2",
-//       description: "company test2",
-//     });
-//     expect(resp.body).toEqual({"company": {
-//       "code": "test2",
-//       "name": "Test2",
-//       "description": "company test2",
-//     }});
+    expect(resp.body).toEqual({"invoice": {
+      "id": expect.any(Number),
+      "amt": "30.00",
+      "paid": false,
+      "add_date": expect.any(String),
+      "paid_date": null,
+      "comp_code": company.code
+    }});
 
-//     const afterPost = await db.query(
-//       `SELECT code, name, description
-//             FROM companies`);
-//     const afterPostCompanies = afterPost.rows; 
-//     expect(afterPostCompanies.length).toEqual(2);
-//   });
+    const afterPost = await db.query(
+      `SELECT id
+            FROM invoices`);
+    const afterPostInvoices = afterPost.rows; 
+    expect(afterPostInvoices.length).toEqual(3);
+  });
 
-//   it("Fails to add if they have the same company code", async function () {
-//     const beforePost = await db.query(
-//       `SELECT code, name, description
-//             FROM companies`);
-//     const beforePostCompanies = beforePost.rows;
-//     expect(beforePostCompanies.length).toEqual(1);
+  it("Fails to add if invalid company code", async function () {
+    const beforePost = await db.query(
+      `SELECT id
+            FROM invoices`);
+    const beforePostInvoices = beforePost.rows;
+    expect(beforePostInvoices.length).toEqual(2);
 
-//     const resp = await request(app).post("/companies").send({
-//       code: "test",
-//       name: "Test2",
-//       description: "company test2",
-//     });
-//     expect(resp.statusCode).toEqual(500);
+    const resp = await request(app).post("/invoices").send({
+      comp_code: "notexist",
+      amt: "30",
+    });
+    expect(resp.statusCode).toEqual(500);
 
-//     const afterPost = await db.query(
-//       `SELECT code, name, description
-//             FROM companies`);
-//     const afterPostCompanies = afterPost.rows; 
-//     expect(afterPostCompanies.length).toEqual(1)    
-//   });
-
-//   it("Fails to add if they have the same company name", async function () {
-//     const beforePost = await db.query(
-//       `SELECT code, name, description
-//             FROM companies`);
-//     const beforePostCompanies = beforePost.rows;
-//     expect(beforePostCompanies.length).toEqual(1);
-
-//     const resp = await request(app).post("/companies").send({
-//       code: "test2",
-//       name: "Test",
-//       description: "company test2",
-//     });
-//     expect(resp.statusCode).toEqual(500);
-
-//     const afterPost = await db.query(
-//       `SELECT code, name, description
-//             FROM companies`);
-//     const afterPostCompanies = afterPost.rows; 
-//     expect(afterPostCompanies.length).toEqual(1)    
-//   });
+    const afterPost = await db.query(
+      `SELECT id
+            FROM invoices`);
+    const afterPostInvoices = afterPost.rows; 
+    expect(afterPostInvoices.length).toEqual(2)  ;  
+  });   
+});
 
 //   describe("PUT /companies/:code", function () {
 //     it("Updates a company's information", async function () {
@@ -218,3 +201,7 @@ describe("GET /invoices", function () {
 //     });
 //   });
 // });
+
+afterAll(async function () {
+  await db.end();
+});

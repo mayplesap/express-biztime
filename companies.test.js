@@ -3,19 +3,17 @@ const app = require("./app");
 const db = require("./db");
 
 beforeEach(async function () {
-  await db.query("DELETE FROM invoices");
   await db.query("DELETE FROM companies");
+  await db.query("DELETE FROM invoices");
 
   await db.query(
     `INSERT INTO companies (code, name, description)
-    VALUES ('test', 'Test', 'company test')
-    RETURNING code;`);
+    VALUES ('test', 'Test', 'company test');`);
 
   await db.query(
     `INSERT INTO invoices (comp_code, amt)
     VALUES ('test', '10'),
-           ('test', '20')
-    RETURNING id, comp_code, amt, paid, add_date, paid_date;`);
+           ('test', '20');`);
 })
 
 
@@ -203,4 +201,8 @@ describe("POST /companies", function () {
       expect(afterDeleteCompanies.length).toEqual(1);  
     });
   });
+});
+
+afterAll(async function () {
+  await db.end();
 });
