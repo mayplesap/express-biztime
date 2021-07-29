@@ -15,17 +15,29 @@ router.get("/", async function (req, res, next) {
   return res.json({ companies });
 });
 
-/** GET company: Return obj of company: {company: {code, name, description}} */
+/** GET company: Return obj of company: 
+ * {company: {code, name, description, invoices: [id, ...]}} */
 router.get("/:code", async function (req, res, next) {
-  const result = await db.query(
+  const companyResult = await db.query(
       `SELECT code, name, description FROM companies
           WHERE code=$1`, [req.params.code]);
-  const company = result.rows[0];
+  const company = companyResult.rows[0];
   
-  if (result.rowCount < 1) {
+  if (companyResult.rowCount < 1) {
     throw new NotFoundError();
   }
-  return res.json({ company });
+
+  const invoiceResult = await db.query(
+    `SELECT id, amt, paid, add_date, paid_date, comp_code
+        FROM invoices
+        WHERE comp_code=$1`, [req.params.code]);
+  const invoice = invoiceResult.rows;
+
+  const result = { code:company.code,
+    name:company.name,
+    description:company.description,
+    invoice };
+  return res.json({ company:result });
 });
 
 /** POST companies: 
@@ -77,7 +89,7 @@ router.delete("/:code", async function (req, res, next) {
   }
 
   await db.query(`DELETE FROM companies WHERE code=$1`, 
-  [req.params.code]);
+    [req.params.code]);
   return res.json({status: "deleted"});
 })
 
