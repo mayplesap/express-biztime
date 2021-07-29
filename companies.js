@@ -28,12 +28,11 @@ router.get("/:code", async function (req, res, next) {
   }
 
   const invoicesResult = await db.query(
-    `SELECT id, amt, paid, add_date, paid_date, comp_code
+    `SELECT id
         FROM invoices
         WHERE comp_code=$1`, [req.params.code]);
-  const invoices = invoicesResult.rows;
 
-  company.invoices = invoices;
+  company.invoices = invoicesResult.rows.map(i => i.id);
   return res.json({ company });
 });
 
@@ -79,15 +78,15 @@ router.put("/:code", async function (req, res, next) {
  */
 router.delete("/:code", async function (req, res, next) {
   const result = await db.query(
-    `SELECT code FROM companies
-    WHERE code=$1`, [req.params.code]);
+    `DELETE FROM companies 
+        WHERE code=$1
+        RETURNING code`, 
+  [req.params.code]);
+  const company = result.rows[0];
 
-  if (result.rowCount < 1) {
+  if (!company) {
     throw new NotFoundError(`Company ${req.params.code} not found`);
   }
-
-  await db.query(`DELETE FROM companies WHERE code=$1`, 
-    [req.params.code]);
   return res.json({status: "deleted"});
 })
 

@@ -83,16 +83,23 @@ router.put("/:id", async function (req, res, next) {
  * Returns {status: "deleted"}
  */
 router.delete("/:id", async function (req, res, next) {
-  const result = await db.query(
-    `SELECT id FROM invoices
-    WHERE id=$1`, [req.params.id]);
+  // const result = await db.query(
+  //   `SELECT id FROM invoices
+  //   WHERE id=$1`, [req.params.id]);
 
-  if (result.rowCount < 1) {
+  // if (result.rowCount < 1) {
+  //   throw new NotFoundError(`Invoice ${req.params.id} not found`);
+  // }
+
+  const result = await db.query(
+    `DELETE FROM invoices 
+        WHERE id=$1
+        RETURNING id`, 
+  [req.params.id]);
+  const invoice = result.rows[0];
+  if (!invoice) {
     throw new NotFoundError(`Invoice ${req.params.id} not found`);
   }
-
-  await db.query(`DELETE FROM invoices WHERE id=$1`, 
-  [req.params.id]);
   return res.json({status: "deleted"});
 })
 
