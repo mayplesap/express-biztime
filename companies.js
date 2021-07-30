@@ -39,7 +39,23 @@ router.get("/:code", async function (req, res, next) {
 /** POST companies: 
  * given JSON like: {code, name, description}
  * Returns obj of new company: {company: {code, name, description}} */
+// TODO make try catch to catch and raise errors 
 router.post("/", async function (req, res, next) {
+  // const { code, name, description } = req.body;
+  // try {
+    
+
+  //   const result = await db.query(
+  //     `INSERT INTO companies (code, name, description)
+  //         VALUES ($1, $2, $3)
+  //         RETURNING code, name, description`, 
+  //     [code, name, description]
+  //   );
+  //   const company = result.rows[0];
+  //   return res.status(201).json({ company })
+  // } catch(e) {
+  //   raise(error)
+  // }
   const { code, name, description } = req.body;
 
   const result = await db.query(
@@ -83,7 +99,6 @@ router.delete("/:code", async function (req, res, next) {
         RETURNING code`, 
   [req.params.code]);
   const company = result.rows[0];
-
   if (!company) {
     throw new NotFoundError(`Company ${req.params.code} not found`);
   }
